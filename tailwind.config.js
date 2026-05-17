@@ -1,0 +1,46 @@
+export default {
+  content: ["./index.html","./src/**/*.{js,jsx}"],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#00ff88",
+        "primary-container": "#00ff88",
+        "on-primary": "#003919",
+        "on-primary-container": "#007139",
+        "primary-fixed": "#60ff99",
+        "primary-fixed-dim": "#00e479",
+        surface: "#131313",
+        "surface-container-lowest": "#0e0e0e",
+        "surface-container-low": "#1b1b1b",
+        "surface-container": "#1f1f1f",
+        "surface-container-high": "#2a2a2a",
+        "surface-container-highest": "#353535",
+        "surface-variant": "#353535",
+        "on-surface": "#e2e2e2",
+        "on-surface-variant": "#b9cbb9",
+        background: "#131313",
+        "on-background": "#e2e2e2",
+        outline: "#849585",
+        "outline-variant": "#3b4b3d",
+        error: "#ffb4ab",
+        "error-container": "#93000a",
+        secondary: "#c8c6c5",
+        "secondary-container": "#4a4949",
+      },
+      fontFamily: {
+        sora: ["Sora","sans-serif"],
+        inter: ["Inter","sans-serif"],
+      },
+      spacing: {
+        xs:"8px", sm:"16px", md:"24px", lg:"32px", xl:"48px",
+        "cp":"20px", gutter:"16px",
+      },
+      borderRadius: {
+        DEFAULT:"0.25rem", lg:"0.5rem", xl:"0.75rem",
+        "2xl":"1.25rem", full:"9999px",
+      },
+    },
+  },
+  plugins: [],
+}
