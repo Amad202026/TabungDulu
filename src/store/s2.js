@@ -71,7 +71,6 @@ export const useStore = create((set, get) => {
         const cats = loadCats(sUser.id)
         set({ authUser: sess, categories: cats, ...localData, authLoading: false })
         get().loadTransactions()
-          get().loadTargets()
       } else {
         set({ authLoading: false })
       }
@@ -84,7 +83,6 @@ export const useStore = create((set, get) => {
           const cats = loadCats(sUser.id)
           set({ authUser: sess, authError: null, categories: cats, ...localData })
           get().loadTransactions()
-          get().loadTargets()
         } else {
           set({
             authUser: null, user: null, targets: [], transactions: [],
@@ -125,7 +123,6 @@ export const useStore = create((set, get) => {
       saveDB(sess.uid, localData)
       set({ authUser: sess, authError: null, categories: cats, ...localData })
       get().loadTransactions()
-          get().loadTargets()
       return true
     },
 
@@ -235,62 +232,15 @@ export const useStore = create((set, get) => {
 
     // ── TARGETS ───────────────────────────────────────────────────────
     addTarget: (t) => {
-      const s = get()
-      const tempId = 'tmp_' + Date.now()
-      const newT = { ...t, id: tempId, saved: t.saved || 0 }
-      set({ targets: [...s.targets, newT] })
+      set(s => ({ targets: [...s.targets, { ...t, id: s.nextId, saved: 0 }], nextId: s.nextId + 1 }))
       get()._persist()
-      if (s.authUser) {
-        supabase.from('goals').insert({
-          id_user: s.authUser.uid, name: t.name, target_amount: t.goal,
-          current_amount: t.saved || 0, deadline: t.deadline || null, image_url: t.icon || null,
-        }).select().single().then(({ data, error }) => {
-          if (error) return
-          set(ss => ({ targets: ss.targets.map(x => x.id === tempId ? { ...x, id: data.id } : x) }))
-          get()._persist()
-        })
-      }
     },
     updateTarget: (id, d) => {
-      const s = get()
-      set({ targets: s.targets.map(t => t.id === id ? { ...t, ...d } : t) })
+      set(s => ({ targets: s.targets.map(t => t.id === id ? { ...t, ...d } : t) }))
       get()._persist()
-      if (s.authUser && typeof id === 'string' && !id.startsWith('tmp_')) {
-        const payload = {}
-        if (d.name !== undefined) payload.name = d.name
-        if (d.goal !== undefined) payload.target_amount = d.goal
-        if (d.saved !== undefined) payload.current_amount = d.saved
-        if (d.deadline !== undefined) payload.deadline = d.deadline || null
-        if (d.icon !== undefined) payload.image_url = d.icon
-        supabase.from('goals').update(payload).eq('id', id).then(() => {})
-      }
     },
     deleteTarget: (id) => {
-      const s = get()
-      set({ targets: s.targets.filter(t => t.id !== id) })
-      get()._persist()
-      if (s.authUser && typeof id === 'string' && !id.startsWith('tmp_')) {
-        supabase.from('goals').delete().eq('id', id).then(() => {})
-      }
-    },
-    clearAllTargets: () => {
-      const s = get()
-      set({ targets: [] })
-      get()._persist()
-      if (s.authUser) supabase.from('goals').delete().eq('id_user', s.authUser.uid).then(() => {})
-    },
-
-    loadTargets: async () => {
-      const s = get()
-      if (!s.authUser) return
-      const { data, error } = await supabase
-        .from('goals').select('*').eq('id_user', s.authUser.uid).order('created_at', { ascending: true })
-      if (error || !data) return
-      const mapped = data.map(r => ({
-        id: r.id, name: r.name, goal: parseFloat(r.target_amount),
-        saved: parseFloat(r.current_amount || 0), deadline: r.deadline, icon: r.image_url,
-      }))
-      set({ targets: mapped })
+      set(s => ({ targets: s.targets.filter(t => t.id !== id) }))
       get()._persist()
     },
 
@@ -307,12 +257,8 @@ export const useStore = create((set, get) => {
       if (!target) return 0
       const maxDeposit = Math.min(amt, available, target.goal - target.saved)
       if (maxDeposit <= 0) return 0
-      const newSaved = target.saved + maxDeposit
-      set(ss => ({ targets: ss.targets.map(t => t.id === id ? { ...t, saved: newSaved } : t) }))
+      set(ss => ({ targets: ss.targets.map(t => t.id === id ? { ...t, saved: t.saved + maxDeposit } : t) }))
       get()._persist()
-      if (s.authUser && typeof id === 'string' && !id.startsWith('tmp_')) {
-        supabase.from('goals').update({ current_amount: newSaved }).eq('id', id).then(() => {})
-      }
       return maxDeposit
     },
 
@@ -340,6 +286,7 @@ export const useStore = create((set, get) => {
       get()._persist()
       if (s.authUser) supabase.from('transactions').delete().eq('user_id', s.authUser.uid).then(() => {})
     },
+    clearAllTargets:      () => { set({ targets: [] }); get()._persist() },
     clearAllRecurring:    () => { set({ recurring: [] }); get()._persist() },
     clearAllData: () => {
       set({ transactions: [], targets: [], recurring: [], nextId: 1, aiChats: [{ role: 'ai', text: 'Data direset! Siap bantu dari awal 💚' }] })
