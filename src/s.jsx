@@ -51,7 +51,7 @@ function Layout() {
           </Routes>
         </main>
       </div>
-      <BottomNav />
+      <BottomNav onAdd={() => setModal('income')} />
       <TxnModal open={!!modal} onClose={() => setModal(null)} defaultType={modal || 'income'} />
       <Toast />
       {showOnboard && <Onboarding onDone={doneOnboard} />}

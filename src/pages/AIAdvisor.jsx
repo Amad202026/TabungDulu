@@ -262,45 +262,6 @@ export default function AIAdvisor() {
   return (
     <div className="fade-up h-[calc(100vh-80px-64px)] lg:h-[calc(100vh-80px-48px)] flex flex-col lg:flex-row gap-5">
 
-      {/* ── Panel kiri ── */}
-      <div className="lg:w-64 shrink-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin lg:pb-0 pb-0">
-        <div className="bg-surface border border-outline-variant rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="relative">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-container/30 to-primary-container/10 border border-primary-container/30 flex items-center justify-center text-xl">
-                🤖
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-primary-container rounded-full border-2 border-surface blink" />
-            </div>
-            <div>
-              <p className="text-sm font-sora font-bold text-white">Tablu</p>
-              <p className="text-[10px] text-primary-container font-semibold">AI Advisor TabungDulu</p>
-            </div>
-          </div>
-          <p className="text-xs text-on-surface-variant leading-relaxed">
-            Aktifkan Mic, lalu panggil <b>"Hey Tablu"</b>. Dia bakal nyahut dan siap dengerin perintahmu layaknya asisten pribadi!
-          </p>
-        </div>
-
-        <div className="bg-surface border border-outline-variant rounded-2xl p-5">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-3">Yang Bisa Tablu Lakukan</p>
-          <div className="space-y-2">
-            {[
-              ['edit_note',      'Catat & edit transaksi dari chat'],
-              ['event_repeat',   'Set gaji harian/mingguan/bulanan'],
-              ['savings',        'Isi & buat target tabungan'],
-              ['volume_up',      'Bisa ngomong & dengerin panggilan'],
-              ['tips_and_updates','Saran & analisis keuangan'],
-            ].map(([icon, label]) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-primary-container text-[15px]">{icon}</span>
-                <span className="text-xs text-on-surface">{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* ── Panel chat ── */}
       <div className="flex-1 bg-surface border border-outline-variant rounded-2xl flex flex-col min-h-0 overflow-hidden">
         <div className="px-5 py-3 border-b border-outline-variant flex items-center justify-between shrink-0 bg-surface-container-high/20">
