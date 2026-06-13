@@ -61,6 +61,19 @@ function Layout() {
 
 export default function App() {
   const authUser = useStore(s => s.authUser)
+  const authLoading = useStore(s => s.authLoading)
+  const initAuth = useStore(s => s.initAuth)
+
+  useEffect(() => { initAuth() }, [])
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Memuat...</p>
+      </div>
+    )
+  }
+
   return (
     <BrowserRouter>
       {authUser ? <Layout /> : <Auth />}

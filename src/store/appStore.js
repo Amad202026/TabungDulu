@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import { supabase } from '../lib/supabase'
 
-// ── DB helpers ──────────────────────────────────────────────────────────
+// ── DB helpers (sementara dipakai untuk data non-auth, lokal) ───────────
 const DB_KEY   = (uid) => `tabungdulu_${uid}`
 const CATS_KEY = (uid) => `tabungdulu_cats_${uid}`
 
@@ -9,18 +10,6 @@ function loadDB(uid) {
 }
 function saveDB(uid, data) {
   try { localStorage.setItem(DB_KEY(uid), JSON.stringify(data)) } catch {}
-}
-
-const USERS_KEY = 'tabungdulu_users'
-function loadUsers() {
-  try { const r = localStorage.getItem(USERS_KEY); return r ? JSON.parse(r) : {} } catch { return {} }
-}
-function saveUsers(u) { try { localStorage.setItem(USERS_KEY, JSON.stringify(u)) } catch {} }
-function loadSession() {
-  try { const r = localStorage.getItem('tabungdulu_session'); return r ? JSON.parse(r) : null } catch { return null }
-}
-function saveSession(s) {
-  try { if (s) localStorage.setItem('tabungdulu_session', JSON.stringify(s)); else localStorage.removeItem('tabungdulu_session') } catch {}
 }
 
 // Default categories per user
@@ -48,21 +37,15 @@ const emptyState = (user) => ({
   settings: { currency: 'IDR', notifWeekly: true, notifTarget: true, twoFA: false },
 })
 
-const session = loadSession()
-
 export const useStore = create((set, get) => {
-  const initData = session ? (loadDB(session.uid) || emptyState(session)) : null
-  const initCats = session ? loadCats(session.uid) : { income: [...DEFAULT_INCOME_CATS], expense: [...DEFAULT_EXPENSE_CATS] }
-
   return {
-    authUser: session || null,
+    authUser: null,
     authError: null,
-    categories: initCats,
-    ...(initData || {
-      user: null, targets: [], transactions: [], recurring: [],
-      aiChats: [], nextId: 1,
-      settings: { currency: 'IDR', notifWeekly: true, notifTarget: true, twoFA: false },
-    }),
+    authLoading: true,
+    categories: { income: [...DEFAULT_INCOME_CATS], expense: [...DEFAULT_EXPENSE_CATS] },
+    user: null, targets: [], transactions: [], recurring: [],
+    aiChats: [], nextId: 1,
+    settings: { currency: 'IDR', notifWeekly: true, notifTarget: true, twoFA: false },
 
     _persist: () => {
       const s = get()
@@ -79,37 +62,69 @@ export const useStore = create((set, get) => {
     },
 
     // ── AUTH ─────────────────────────────────────────────────────────
-    register: ({ name, email, password }) => {
-      const users = loadUsers()
-      if (users[email]) { set({ authError: 'Email sudah terdaftar!' }); return false }
-      const uid = 'u_' + Date.now()
-      users[email] = { uid, name, email, password }
-      saveUsers(users)
-      const sess = { uid, email, name }
-      saveSession(sess)
-      const data = emptyState({ name, email })
-      const cats = { income: [...DEFAULT_INCOME_CATS], expense: [...DEFAULT_EXPENSE_CATS] }
-      saveDB(uid, data)
-      saveCats(uid, cats)
-      set({ authUser: sess, authError: null, ...data, categories: cats })
+    initAuth: async () => {
+      const { data } = await supabase.auth.getSession()
+      const sUser = data?.session?.user
+      if (sUser) {
+        const sess = { uid: sUser.id, email: sUser.email, name: sUser.user_metadata?.name || sUser.email }
+        const localData = loadDB(sUser.id) || emptyState(sess)
+        const cats = loadCats(sUser.id)
+        set({ authUser: sess, categories: cats, ...localData, authLoading: false })
+      } else {
+        set({ authLoading: false })
+      }
+
+      supabase.auth.onAuthStateChange((_event, session) => {
+        const sUser = session?.user
+        if (sUser) {
+          const sess = { uid: sUser.id, email: sUser.email, name: sUser.user_metadata?.name || sUser.email }
+          const localData = loadDB(sUser.id) || emptyState(sess)
+          const cats = loadCats(sUser.id)
+          set({ authUser: sess, authError: null, categories: cats, ...localData })
+        } else {
+          set({
+            authUser: null, user: null, targets: [], transactions: [],
+            recurring: [], aiChats: [], nextId: 1,
+            settings: { currency: 'IDR', notifWeekly: true, notifTarget: true, twoFA: false },
+            categories: { income: [...DEFAULT_INCOME_CATS], expense: [...DEFAULT_EXPENSE_CATS] },
+          })
+        }
+      })
+    },
+
+    register: async ({ name, email, password }) => {
+      const { data, error } = await supabase.auth.signUp({
+        email, password, options: { data: { name } },
+      })
+      if (error) { set({ authError: error.message }); return false }
+      // jika konfirmasi email diaktifkan, session bisa null
+      if (data.session && data.user) {
+        const sess = { uid: data.user.id, email: data.user.email, name }
+        const emptyData = emptyState(sess)
+        const cats = { income: [...DEFAULT_INCOME_CATS], expense: [...DEFAULT_EXPENSE_CATS] }
+        saveDB(sess.uid, emptyData)
+        saveCats(sess.uid, cats)
+        set({ authUser: sess, authError: null, categories: cats, ...emptyData })
+      } else {
+        set({ authError: 'Cek email kamu untuk konfirmasi akun, lalu login.' })
+      }
       return true
     },
 
-    login: ({ email, password }) => {
-      const users = loadUsers()
-      const u = users[email]
-      if (!u) { set({ authError: 'Email tidak ditemukan!' }); return false }
-      if (u.password !== password) { set({ authError: 'Password salah!' }); return false }
-      const sess = { uid: u.uid, email: u.email, name: u.name }
-      saveSession(sess)
-      const data = loadDB(u.uid) || emptyState(u)
-      const cats = loadCats(u.uid)
-      set({ authUser: sess, authError: null, ...data, categories: cats })
+    login: async ({ email, password }) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) { set({ authError: 'Email atau password salah!' }); return false }
+      const sUser = data.user
+      const sess = { uid: sUser.id, email: sUser.email, name: sUser.user_metadata?.name || sUser.email }
+      const localData = loadDB(sess.uid) || emptyState(sess)
+      const cats = loadCats(sess.uid)
+      saveDB(sess.uid, localData)
+      set({ authUser: sess, authError: null, categories: cats, ...localData })
       return true
     },
 
-    logout: () => {
-      saveSession(null)
+    logout: async () => {
+      await supabase.auth.signOut()
       set({
         authUser: null, authError: null, user: null, targets: [], transactions: [],
         recurring: [], aiChats: [], nextId: 1,
@@ -238,12 +253,12 @@ export const useStore = create((set, get) => {
 
 // Expose changePassword as a standalone export helper
 // (called directly, not through zustand, since we need loadUsers/saveUsers)
-export function changePassword(email, oldPw, newPw) {
-  const users = JSON.parse(localStorage.getItem('tabungdulu_users') || '{}')
-  const u = users[email]
-  if (!u) return 'Email tidak ditemukan!'
-  if (u.password !== oldPw) return 'Password lama salah!'
-  users[email] = { ...u, password: newPw }
-  localStorage.setItem('tabungdulu_users', JSON.stringify(users))
+// Ganti password via Supabase Auth
+export async function changePassword(email, oldPw, newPw) {
+  // verifikasi password lama dengan re-login
+  const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password: oldPw })
+  if (loginErr) return 'Password lama salah!'
+  const { error } = await supabase.auth.updateUser({ password: newPw })
+  if (error) return error.message
   return null // null = success
 }
